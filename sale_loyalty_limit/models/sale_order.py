@@ -4,6 +4,17 @@ from odoo import models
 class SaleOrder(models.Model):
     _inherit = "sale.order"
 
+    def _max_customer_application_domain(self, program):
+        return [
+            ("order_line.loyalty_program_id", "=", program.id),
+            ("id", "!=", self._origin.id),
+            (
+                "commercial_partner_id",
+                "=",
+                self.commercial_partner_id.id,
+            ),
+        ]
+
     def _program_check_compute_points(self, programs):
         res = super()._program_check_compute_points(programs)
         # Iterate through the programs that initially have no errors
@@ -12,15 +23,7 @@ class SaleOrder(models.Model):
                 continue
             # Customer limit rules
             if program.max_customer_application:
-                customer_domain = [
-                    ("order_line.loyalty_program_id", "=", program.id),
-                    ("id", "!=", self._origin.id),
-                    (
-                        "commercial_partner_id",
-                        "=",
-                        self.commercial_partner_id.id,
-                    ),
-                ]
+                customer_domain = self._max_customer_application_domain(program)
                 order_count = self.env["sale.order"].search_count(customer_domain)
                 limit_reached = order_count >= program.max_customer_application
                 if limit_reached and self.applied_coupon_ids:
