@@ -11,15 +11,18 @@ _logger = logging.getLogger(__name__)
 class SaleOrder(models.Model):
     _inherit = "sale.order"
 
-    _override_cache = {}
-
-    def _get_applicable_partner_for_loyalty_program(self):
+    def _get_applicable_partner_for_loyalty_program(self, program=None):
         """Return the partner to use for the loyalty program.
 
         In some context you could want to use a different partner than the one
         on the order (for example, the commercial entity). This method allows
         to override the partner to use to check the applicability of the loyalty
         program.
+
+        ``program`` is accepted so that modules defining a per-program
+        beneficiary (e.g. one whose partner depends on the specific
+        ``loyalty.program``, not just on the order) can return a different
+        partner for each program instead of a single one for the whole order.
         """
         self.ensure_one()
         return self.partner_id
@@ -39,11 +42,13 @@ class SaleOrder(models.Model):
             [base_domain, [("mode", "=", "with_code"), ("code", "=", code)]]
         )
         rules = self.env["loyalty.rule"].search(domain)
-        applicable_partner = self._get_applicable_partner_for_loyalty_program()
         if not rules:
             program = self.env["loyalty.card"].search([("code", "=", code)]).program_id
             rules = program.rule_ids
         for program in rules.mapped("program_id"):
+            applicable_partner = self._get_applicable_partner_for_loyalty_program(
+                program
+            )
             if not program._is_partner_valid(applicable_partner):
                 return {"error": _("The customer doesn't have access to this reward.")}
         return res

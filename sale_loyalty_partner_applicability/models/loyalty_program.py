@@ -15,10 +15,15 @@ class LoyaltyProgram(models.Model):
         # the rules based on the partner domain.
         valid_programs = self
         if current_so:
-            applicable_partner = (
-                current_so._get_applicable_partner_for_loyalty_program()
-            )
+            # The applicable partner is resolved per program (not once for
+            # the whole batch): a module can define a beneficiary partner
+            # that depends on the specific program (e.g. the commercial
+            # entity for one program, the invoiced partner for another),
+            # so a single partner for every program in self would check the
+            # wrong partner for those programs.
             valid_programs = self.filtered(
-                lambda p: p._is_partner_valid(applicable_partner)
+                lambda p: p._is_partner_valid(
+                    current_so._get_applicable_partner_for_loyalty_program(p)
+                )
             )
         return super(LoyaltyProgram, valid_programs)._get_valid_products(products)
